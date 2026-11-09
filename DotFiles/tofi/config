@@ -1,0 +1,24 @@
+width = 100%
+height = 100%
+
+anchor = bottom
+
+# Push everything all the way down
+padding-top = 98%
+
+padding-left = 45% 
+
+
+# Clips the selection line perfectly to the 0px margin edge
+clip-to-padding = true
+
+
+
+border-width = 0
+outline-width = 0
+result-spacing = 25
+num-results = 2
+font = monospace
+font-size = 12
+background-color = #0006
+horizontal = true
