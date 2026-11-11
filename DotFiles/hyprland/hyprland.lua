@@ -241,6 +241,25 @@ hl.bind("XF86AudioMicMute",      hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_
 hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"),                  { locked = true, repeating = true })
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"),                  { locked = true, repeating = true })
 
+local window = hl.dsp.window -- EDIT: Forgot this in initial post >.<
+local left = { x = -10, y = 0, relative = true }
+local down = { x = 0, y = 10, relative = true }
+local up = { x = 0, y = -10, relative = true }
+local right = { x = 10, y = 0, relative = true }
+local function resize_bind(direction_table)
+  return function()
+    hl.dispatch(window.resize(direction_table))
+  end
+end
+local function opts(direction)
+  return { description = 'Resize the active window ' .. direction, repeating = true }
+end
+
+hl.bind('SUPER + ALT + h', resize_bind(left), opts('left'))
+hl.bind('SUPER + ALT + j', resize_bind(down), opts('down'))
+hl.bind('SUPER + ALT + k', resize_bind(up), opts('up'))
+hl.bind('SUPER + ALT + l', resize_bind(right), opts('right'))
+
 -- Media keys (requires playerctl)
 hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),       { locked = true })
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })

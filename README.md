@@ -2,6 +2,8 @@
 
 Config files and a single setup script for my Arch Linux desktop.
 
+![desktop image](https://github.com/Lossymandias/dotfiles/docs/images/imgScreen.png)
+
 ## Environment
 
 | Component | Choice |

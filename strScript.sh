@@ -156,7 +156,7 @@ fi
 # 8. Hyprland environment variables (Lua config)
 # ---------------------------------------------------------------
 
-cp "$SCRUPT_DIR/DotFiles/hyprland/hyprland.lua" ~/.config/hypr/hyprland.lua
+cp "$SCRIPT_DIR/DotFiles/hyprland/hyprland.lua" ~/.config/hypr/hyprland.lua
 
 # ---------------------------------------------------------------
 # 9. Catppuccin hyprtoolkit theme
