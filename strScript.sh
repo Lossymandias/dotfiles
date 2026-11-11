@@ -1,6 +1,33 @@
 #!/usr/bin/env bash
-
+spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
 set -e
+
+
+run_step() {
+    local step_num=$1
+    local description=$2
+    local cmd=$3
+
+    eval "$cmd" > /dev/null 2>&1 &
+    local pid=$!
+
+    local i=0
+    while kill -0 $pid 2>/dev/null; do
+        local char="${spin:i%${#spin}:1}"
+        printf "\r\033[K[%s] Step %d/%d: %s..." "$char" "$step_num" "$total_steps" "$description"
+        i=$((i + 1))
+        sleep 0.1
+    done
+
+    wait $pid
+    if [ $? -eq 0 ]; then
+        printf "\r\033[K[✔] Step %d/%d: %s - Done\n" "$step_num" "$total_steps" "$description"
+    else
+        printf "\r\033[K[✖] Step %d/%d: %s - Failed\n" "$step_num" "$total_steps" "$description"
+        exit 1
+    fi
+}
+
 
 if [ "$EUID" -eq 0 ]; then
     echo "Do not run this script as root. It uses sudo where needed."
@@ -9,9 +36,6 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ---------------------------------------------------------------
-# 1. System update + packages
-# ---------------------------------------------------------------
 sudo pacman -Syu --noconfirm
 
 sudo pacman -S --needed --noconfirm \
@@ -26,7 +50,6 @@ sudo pacman -S --needed --noconfirm \
     python python-pip python-pillow python-numpy xcur2png
 
 # ---------------------------------------------------------------
-#
 # 2. AUR helper (yay)
 # ---------------------------------------------------------------
 if ! command -v yay >/dev/null 2>&1; then
@@ -38,30 +61,20 @@ if ! command -v yay >/dev/null 2>&1; then
     cd ~
 fi
 
-yay -S tofi
-
+yay -S --noconfirm tofi
 
 # ---------------------------------------------------------------
 # 3. Shell frameworks
 # ---------------------------------------------------------------
-# --unattended stops the installers from replacing/spawning a new shell mid-script
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)" "" --unattended
 
-# Oh My Zsh is required for the powerlevel10k path below
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
     RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-fi
-
-if [ ! -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k" ]; then
-    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
-        "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
 fi
 
 yay -S --noconfirm zsh-theme-powerlevel10k-git
 echo 'source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme' >>~/.zshrc
 
-exec zsh
-p10k configure
 
 # ---------------------------------------------------------------
 # 4. Layan KDE theme
@@ -73,17 +86,37 @@ cd ~/Layan-kde
 ./install.sh
 cd ~
 
+
+rm -rf /tmp/Tela-icon-theme
+git clone --depth 1 https://github.com/vinceliuice/Tela-icon-theme /tmp/Tela-icon-theme
+/tmp/Tela-icon-theme/install.sh -c grey
+
+mkdir -p ~/.config/environment.d ~/.config/qt6ct ~/.local/share/icons
+sudo chown -R $USER:$USER ~/.config/environment.d
+echo "QT_QPA_PLATFORMTHEME=qt6ct" > ~/.config/environment.d/qt.conf
+
+sudo chown -R $USER:$USER ~/.config
+rm -f ~/.config/kdeglobals
+cp "$SCRIPT_DIR/DotFiles/kdeglobals/kdeglobals" ~/.config/kdeglobals
+
+kwriteconfig6 --file kdeglobals --group Icons --key Theme Tela-grey-dark
+kwriteconfig6 --file qt6ct/qt6ct.conf --group Appearance --key icon_theme Tela-grey-dark
+
+rm -f ~/.cache/icon-cache.kcache
+kbuildsycoca6 --noincremental
+
 # ---------------------------------------------------------------
-# 5. Waybar + hyprpaper configs
+# 5. Quickshell + hyprpaper configs
 # ---------------------------------------------------------------
 mkdir -p ~/.config/quickshell ~/.config/hypr
 mkdir -p ~/.config/tofi/
+mkdir -p ~/Documents/Backgrounds/hyprpaper
 
 # User-level config (no sudo needed, and survives package updates)
-cp "$SCRIPT_DIR/quickshell/shell.qml" ~/.config/quickshell/shell.qml
-cp "$SCRIPT_DIR/tofi/config" ~/.config/tofi/config
-cp "$SCRIPT_DIR/hyprpaper/hyprpaper.conf"      ~/.config/hypr/hyprpaper.conf
-
+cp "$SCRIPT_DIR/DotFiles/quickshell/shell.qml"       ~/.config/quickshell/shell.qml
+cp "$SCRIPT_DIR/DotFiles/tofi/config"                ~/.config/tofi/config
+cp "$SCRIPT_DIR/DotFiles/hyprpaper/hyprpaper.conf"   ~/.config/hypr/hyprpaper.conf
+cp -r "$SCRIPT_DIR/DotFiles/hyprpaper/Backgrounds/."    ~/Documents/Backgrounds/hyprpaper/
 
 # ---------------------------------------------------------------
 # 6. Kvantum theme
@@ -101,7 +134,6 @@ else
     printf '[General]\ntheme=LayanDark\n' >> "$KV_CONF"
 fi
 
-# Fallback for sessions that source ~/.profile
 touch ~/.profile
 LINE_STYLE='export QT_STYLE_OVERRIDE=kvantum'
 LINE_PLATFORM='export QT_QPA_PLATFORMTHEME=qt6ct'
@@ -123,27 +155,8 @@ fi
 # ---------------------------------------------------------------
 # 8. Hyprland environment variables (Lua config)
 # ---------------------------------------------------------------
-HYPR_LUA="$HOME/.config/hypr/hyprland.lua"
 
-if [ -f "$HYPR_LUA" ]; then
-    if ! grep -q 'QT_STYLE_OVERRIDE' "$HYPR_LUA"; then
-        cat << 'EOF' >> "$HYPR_LUA"
-
--- Qt / Kvantum theming (Dolphin) and cursor
-hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
-hl.env("QT_STYLE_OVERRIDE", "kvantum")
-hl.env("HYPRCURSOR_THEME", "Bibata-Modern-Classic")
-hl.env("HYPRCURSOR_SIZE", "24")
-hl.env("XCURSOR_THEME", "Bibata-Modern-Classic")
-hl.env("XCURSOR_SIZE", "24")
-EOF
-        echo "Environment configuration added to hyprland.lua"
-    else
-        echo "hyprland.lua already configured, skipping"
-    fi
-else
-    echo "WARNING: $HYPR_LUA not found. Start Hyprland once to generate it, then re-run this script."
-fi
+cp "$SCRUPT_DIR/DotFiles/hyprland/hyprland.lua" ~/.config/hypr/hyprland.lua
 
 # ---------------------------------------------------------------
 # 9. Catppuccin hyprtoolkit theme
@@ -162,8 +175,8 @@ fi
 # ---------------------------------------------------------------
 # 10. greetd (enable only; starting it now would kill your current session)
 # ---------------------------------------------------------------
-sudo cp "$SCRIPT_DIR/greetd/config.toml" /etc/greetd/config.toml
-sudo systemctl enable greetd.service
+
+sudo cp "$SCRIPT_DIR/DotFiles/greetd/config.toml" /etc/greetd/config.toml
 
 # ---------------------------------------------------------------
 # 11. NvChad (back up any existing config first; run `nvim` manually afterwards)
@@ -172,14 +185,17 @@ if [ -d ~/.config/nvim ]; then
     mv ~/.config/nvim ~/.config/nvim.bak.$(date +%s)
 fi
 git clone https://github.com/NvChad/starter ~/.config/nvim
+if [ -d "$HOME/.config/nvim" ]; then
+    mv ~/.config/nvim ~/.config/nvim-$(date +%Y-%m-%d_%H-%m-%s)
+fi
+cp  -r "$SCRIPT_DIR/DotFiles/nvim" ~/.config/nvim
 
 # ---------------------------------------------------------------
 # 12. Bibata hyprcursor theme
 # ---------------------------------------------------------------
 cd ~
 
-
-yay -S python-clickgen
+yay -S --noconfirm python-clickgen
 rm -rf ~/Bibata-Cursor-hyprcursor
 git clone https://github.com/LOSEARDES77/Bibata-Cursor-hyprcursor.git
 cd ~/Bibata-Cursor-hyprcursor
@@ -188,17 +204,18 @@ yarn generate
 
 mkdir -p ~/.local/share/icons
 
-# Copy every generated theme directory (identified by its manifest.hl)
 find . -name manifest.hl -not -path "*/node_modules/*" -printf '%h\n' | while read -r dir; do
     cp -r "$dir" ~/.local/share/icons/
 done
 
-cd ~
-
-# hyprctl only works inside a running Hyprland session; the env vars set in
-# hyprland.lua above handle the cursor on the next login.
 if [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
     hyprctl setcursor Bibata-Modern-Classic 24
 fi
 
-echo "Done. Log out/reboot to start greetd."
+cd ~
+
+
+# exec zsh
+# p10k configure
+
+echo "Done. Log out or reboot too apply all the changes"
