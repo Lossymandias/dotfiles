@@ -117,6 +117,7 @@ cp -a "$SCRIPT_DIR/DotFiles/quickshell/."       ~/.config/quickshell/.
 cp "$SCRIPT_DIR/DotFiles/tofi/config"                ~/.config/tofi/config
 cp "$SCRIPT_DIR/DotFiles/hyprpaper/hyprpaper.conf"   ~/.config/hypr/hyprpaper.conf
 cp -r "$SCRIPT_DIR/DotFiles/hyprpaper/Backgrounds/."    ~/Documents/Backgrounds/hyprpaper/
+cp -r "$SCRIPT_DIR/DotFiles/kitty/."    ~/.config/kitty/
 
 # ---------------------------------------------------------------
 # 6. Kvantum theme
