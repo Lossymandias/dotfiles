@@ -1,7 +1,3 @@
--- Hyprland Lua config (converted from hyprland.conf)
--- Refer to https://wiki.hypr.land/Configuring/Start/
-
-
 ------------------
 ---- MONITORS ----
 ------------------
@@ -37,7 +33,7 @@ hl.monitor({
 
 local terminal    = "kitty"
 local fileManager = "dolphin"
-local menu        = "tofi-drun --drun-launch=true"
+local menu        = "qs ipc call launcher toggle"
 
 
 -------------------
@@ -304,16 +300,24 @@ hl.window_rule({
     no_focus = true,
 })
 
-hl.window_rule({
-  match = { class = "kitty" },
-  opacity= "0.95 0.95"
-})
 
 hl.window_rule({
-  match = { class = "electron" },
-  opacity= "0.95 0.95"
+ match = { class = "^(code|code-oss|Code|kitty|Firefox)$" },
+ 
+  opacity= "0.93 0.93"
 })
 
+hl.config({
+  decoration = {
+    blur = {
+      enabled = true,
+      size = 5,        
+      passes = 1,
+      noise = 0.02,
+      brightness = 0.9,
+    },
+  },
+})
 
 hl.window_rule({
     name  = "move-hyprland-run",

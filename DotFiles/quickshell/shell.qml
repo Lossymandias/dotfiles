@@ -10,8 +10,11 @@ import Quickshell.Widgets
 PanelWindow {
     id: root
 
-    // Allow the bar to receive keyboard input when clicked
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+WlrLayershell.keyboardFocus: launcher.active
+    ? WlrKeyboardFocus.Exclusive
+    : WlrKeyboardFocus.OnDemand
+
+WlrLayershell.layer: launcher.active ? WlrLayer.Overlay : WlrLayer.Top
 
     // Theme
     property color colBg: "#000000"
@@ -88,7 +91,9 @@ PanelWindow {
             if (!cpuProc.running) cpuProc.running = true
             if (!memProc.running) memProc.running = true
         }
-    }
+      }
+
+    
 
     RowLayout {
         anchors.fill: parent
@@ -113,136 +118,40 @@ PanelWindow {
                 }
             }
         }
+        
+        Item {
+            id: launcherZone
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-        Item { Layout.fillWidth: true }
+            HoverHandler { id: zoneHover }
 
-TextField {
-    id: terminalInput
-    Layout.preferredWidth: 300
-    Layout.fillHeight: true
-    Layout.topMargin: 0
-    color: root.colFg
-    selectionColor: root.colCyan
-    selectedTextColor: root.colBg
-    font { family: root.fontFamily; pixelSize: 11 }
-    placeholderText: "..."
-    placeholderTextColor: root.colMuted
-
-    background: Rectangle {
-        color: "#11111b"
-//        border.color: terminalInput.activeFocus ? root.colCyan : root.colMuted
- 
-        border.width: 1
-        radius: 4
-      }
-
-      onActiveFocusChanged: {
-        if (!activeFocus) {
-            text = ""
-        }
-    }
-
-    property var matches: []
-    property int matchIndex: -1
-    property string prefix: ""   // everything before the word being completed
-
-    function escapePath(s) {
-        return s.replace(/([ '"\\()&;$`!#*?\[\]{}|<>])/g, "\\$1")
-    }
-
-    function applyMatch() {
-        text = prefix + matches[matchIndex]
-        cursorPosition = text.length
-    }
-
-    onTextEdited: {
-        matches = []
-        matchIndex = -1
-    }
-
-    Process {
-        id: pathProc
-        property string query: ""
-        command: ["bash", "-c",
-            'p="$1"; case "$p" in "~"*) p="$HOME${p#"~"}";; esac; ' +
-            'compgen -f -- "$p" | while IFS= read -r f; do ' +
-            'if [ -d "$f" ]; then echo "$f/"; else echo "$f"; fi; done',
-            "_", query]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const home = Quickshell.env("HOME")
-                const q = pathProc.query
-                const wantsHidden = q.split("/").pop().startsWith(".")
-                let list = text.split("\n").filter(s => s.length > 0)
-
-                if (!wantsHidden)
-                    list = list.filter(s => !s.replace(/\/$/, "").split("/").pop().startsWith("."))
-
-                if (q.startsWith("~"))
-                  list = list.map(s => s.startsWith(home) ? "~" + s.slice(home.length) : s)
-
-                list = list.map(terminalInput.escapePath).sort()
-                if (list.length === 0) return
-
-                terminalInput.matches = list
-                terminalInput.matchIndex = 0
-                terminalInput.applyMatch()
-
-                if (list.length === 1) {
-                    terminalInput.matches = []
-                    terminalInput.matchIndex = -1
-                }
+            BarLauncher {
+                id: launcher
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                hovered: zoneHover.hovered
+                fontFamily: root.fontFamily
             }
         }
-    }
 
-    Keys.onTabPressed: event => {
-        event.accepted = true
-
-        if (matchIndex !== -1) {
-            matchIndex = (matchIndex + 1) % matches.length
-            applyMatch()
-            return
-        }
-
-        const word = text.match(/(?:\\ |[^ ])*$/)[0]
-        prefix = text.slice(0, text.length - word.length)
-        const isFirstWord = prefix.trim().length === 0
-
-        if (isFirstWord && word.length === 0) return
-
-        if (isFirstWord && !/^[\/~.]/.test(word)) {
-            matches = root.commands
-                .filter(c => c.startsWith(word))
-                .sort((a, b) => a.length - b.length)
-                .slice(0, 50)
-            if (matches.length === 0) return
-            matchIndex = 0
-            applyMatch()
-        } else {
-            pathProc.query = word.replace(/\\(.)/g, "$1")
-            pathProc.running = true
-        }
-    }
-
-
-    Keys.onEscapePressed: {
-      
-      focus = false
-    }
-    onAccepted: {
-        if (text.trim().length > 0) {
-            Quickshell.execDetached(["sh", "-c", text])
-            text = ""
-        }
-    }
-}
         Rectangle { width: 1; height: 16; color: root.colMuted }
 
+        TerminalInput {
+          id: terminalInput
+          Layout.preferredWidth: 300
+          Layout.fillHeight: true
+          commands: root.commands
+          colFg: root.colFg
+          colBg: root.colBg
+          colCyan: root.colCyan
+          colMuted: root.colMuted
+          fontFamily: root.fontFamily
+        }
         // CPU
         Text {
-            text: "CPU: " + root.cpuUsage + "%"
-            color: root.colYellow
+            text: "C: " + root.cpuUsage + "%"            
+            color: root.colCyan
             font { family: root.fontFamily; pixelSize: root.fontSize; bold: true }
         }
 
@@ -250,12 +159,53 @@ TextField {
 
         // Memory
         Text {
-            text: "Mem: " + root.memUsage + "%"
+            text: "M: " + root.memUsage + "%"
             color: root.colCyan
             font { family: root.fontFamily; pixelSize: root.fontSize; bold: true }
         }
 
+
         Rectangle { width: 1; height: 16; color: root.colMuted }
+
+
+        Loader {
+          id: batteryLoader
+
+          // Check if UPower.devices contains an actual physical battery with real capacity
+          readonly property bool hasBattery: {
+              let list = UPower.devices.values;
+              for (let i = 0; i < list.length; i++) {
+                  let dev = list[i];
+                  if (dev.isLaptopBattery && dev.isPresent && dev.energyCapacity > 0) {
+                      return true;
+                  }
+              }
+              return false;
+          }
+
+          active: hasBattery
+          visible: active
+
+          // Collapse completely in any layout when inactive
+          Layout.preferredWidth: active ? implicitWidth : 0
+          Layout.preferredHeight: active ? implicitHeight : 0
+          width: active ? implicitWidth : 0
+          height: active ? implicitHeight : 0
+
+          sourceComponent: Text {
+              readonly property var bat: UPower.displayDevice
+              property int pct: bat.percentage <= 1 
+                  ? Math.round(bat.percentage * 100) 
+                  : Math.round(bat.percentage)
+
+              text: "🔋" + pct + "%"
+                  color: root.colCyan
+                  font { family: root.fontFamily; pixelSize: root.fontSize; bold: true }        
+          }
+
+
+          Rectangle { width: active ? 1 : 0; height: 16; color: root.colMuted }
+        }
 
         // Clock
         Text {

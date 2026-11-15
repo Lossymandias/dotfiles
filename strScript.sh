@@ -113,7 +113,7 @@ mkdir -p ~/.config/tofi/
 mkdir -p ~/Documents/Backgrounds/hyprpaper
 
 # User-level config (no sudo needed, and survives package updates)
-cp "$SCRIPT_DIR/DotFiles/quickshell/shell.qml"       ~/.config/quickshell/shell.qml
+cp -a "$SCRIPT_DIR/DotFiles/quickshell/."       ~/.config/quickshell/.
 cp "$SCRIPT_DIR/DotFiles/tofi/config"                ~/.config/tofi/config
 cp "$SCRIPT_DIR/DotFiles/hyprpaper/hyprpaper.conf"   ~/.config/hypr/hyprpaper.conf
 cp -r "$SCRIPT_DIR/DotFiles/hyprpaper/Backgrounds/."    ~/Documents/Backgrounds/hyprpaper/
